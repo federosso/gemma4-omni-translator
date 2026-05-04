@@ -28,6 +28,49 @@ Most translation apps rely on a multi-step pipeline (Speech-to-Text -> Text Tran
 
 ## 🏗️ Architecture Under the Hood
 
+```mermaid
+graph TD
+    %% Styles
+    classDef frontend fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
+    classDef backend fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
+    classDef ai fill:#3f2a14,stroke:#f59e0b,stroke-width:2px,color:#fff
+
+    %% Nodes and Groups
+    subgraph Browser_UI ["🖥️ Step 1: Frontend"]
+        A(["🎙️ User Speaks"])
+        B["WebM Recording"]
+    end
+
+    subgraph Server ["⚙️ Step 2: Flask Backend"]
+        C["Receive POST API"]
+        D["FFmpeg: Convert to WAV 16kHz"]
+    end
+
+    subgraph CoreAI ["🧠 Step 3: Edge AI"]
+        E{"Gemma 4 E2B Multimodal"}
+        F["float16 Offline Inference"]
+    end
+    
+    subgraph Output_UI ["🎧 Step 4: Output"]
+        G["gTTS: Generate Base64 Audio"]
+        H(["🎧 Play Audio & Text"])
+    end
+
+    %% Connections
+    A --> B
+    B -->|"POST /api/translate_speech"| C
+    C --> D
+    D -->|"Raw Audio + Prompt"| E
+    E --> F
+    F -->|"Translated Text"| G
+    G -->|"Translated Base64 Audio"| H
+
+    %% Apply Classes Safely
+    class A,B,H frontend
+    class C,D,G backend
+    class E,F ai
+```
+
 * **Core Model:** `google/gemma-4-E2B-it` (Loaded in `float16` for VRAM optimization).
 * **Backend:** Python + Flask.
 * **Audio Processing:** `ffmpeg` processes raw browser webm recordings into strict 16kHz mono WAV files required by the Gemma Omni-processor.
