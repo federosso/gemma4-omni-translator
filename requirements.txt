@@ -1,0 +1,25 @@
+# Gemma 4 NATIVE Audio Translator - Requirements
+# REQUISITO ESTERNO: ffmpeg deve essere installato e nel PATH
+
+# 1. PyTorch 2.6+ con accelerazione CUDA (GPU) per RTX 4050
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch>=2.6.0
+torchvision>=0.21.0
+torchaudio>=2.6.0
+
+# 2. Core Machine Learning (Gemma 4 Multimodale & Dependencies)
+transformers>=4.45.0
+accelerate>=0.26.0
+huggingface_hub
+pillow>=12.0.0
+
+# 3. Text-to-Speech (Zero-VRAM cost)
+gTTS>=2.5.0
+
+# 4. Web Server & API
+flask>=3.0.0
+
+# 5. Audio Processing
+numpy>=1.24.0
+soundfile>=0.12.0
+librosa>=0.10.0
