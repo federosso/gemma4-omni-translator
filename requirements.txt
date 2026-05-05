@@ -1,0 +1,29 @@
+# Gemma 4 Omni-Translator - app requirements
+# PyTorch CUDA is intentionally NOT listed here.
+# Install it first with:
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+
+# Hugging Face / Gemma 4
+transformers>=4.57.0
+accelerate>=1.11.0
+huggingface_hub>=0.36.0
+safetensors>=0.4.5
+sentencepiece>=0.2.0
+protobuf>=5.0.0
+
+# Web server
+flask>=3.0.0
+python-dotenv>=1.0.1
+
+# Audio processing
+numpy>=1.26.0,<3.0.0
+librosa>=0.10.2
+soundfile>=0.12.1
+
+# Image / multimodal support
+pillow>=10.0.0
+
+# Offline Text-to-Speech
+# Installs Piper Python package / CLI.
+# You still need local .onnx voice models inside voices/.
+piper-tts>=1.4.2

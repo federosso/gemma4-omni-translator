@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemma 4 Omni-Translator</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root {
+    --bg: #0c0e12; --surface: #14171e; --surface2: #1c2029;
+    --border: rgba(255,255,255,0.08); --text: #e8eaed; --text2: #8b8f98;
+    --accent: #f59e0b; --accent2: #fb923c; --accent-glow: rgba(245,158,11,0.15);
+    --danger: #ef4444; --success: #22c55e; --radius: 16px; --radius-sm: 12px;
+  }
+
+  body {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text);
+    min-height: 100vh; overflow-x: hidden;
+  }
+  body::before { content:''; position:fixed; top:-40%; left:-20%; width:80vw; height:80vw; background:radial-gradient(circle, rgba(245,158,11,0.05) 0%, transparent 70%); pointer-events:none; z-index:0; }
+
+  .app { position:relative; z-index:1; max-width: 680px; margin: 0 auto; padding: 3rem 1.25rem; }
+
+  /* ── Header & Logo ── */
+  .header { text-align: center; margin-bottom: 2.5rem; }
+  .logo-svg { width: 56px; height: 56px; color: var(--accent); margin-bottom: 10px; filter: drop-shadow(0 0 12px var(--accent-glow)); }
+  .header h1 { font-size: 1.8rem; font-weight: 700; background: linear-gradient(135deg, #fff 0%, var(--accent) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header .subtitle { color: var(--text2); font-size: 0.9rem; margin-top: 0.5rem; }
+  
+  .badge-row { display: flex; justify-content: center; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; }
+  .badge { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--surface2); border: 1px solid var(--border); padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; color: var(--text); }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; background: var(--surface); border-radius: var(--radius); padding: 5px; margin-bottom: 1.5rem; border: 1px solid var(--border); }
+  .tab-btn { flex: 1; padding: 0.8rem; background: transparent; border: none; color: var(--text2); font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; border-radius: calc(var(--radius) - 5px); transition: all 0.3s; }
+  .tab-btn.active { background: var(--surface2); color: var(--accent); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: 0 8px 30px rgba(0,0,0,0.2); }
+
+  /* ── Selectors ── */
+  .lang-row { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1.5rem; }
+  .lang-select-wrap { flex: 1; }
+  .lang-select-wrap label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text2); text-transform: uppercase; margin-bottom: 0.4rem; }
+  .lang-select { width: 100%; padding: 0.8rem 1rem; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: 0.95rem; cursor: pointer; appearance: none; transition: 0.2s; }
+  .lang-select:focus { outline: none; border-color: var(--accent); }
+  .swap-btn { width: 44px; height: 44px; margin-top: 1.2rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 50%; color: var(--accent); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; flex-shrink: 0; }
+  .swap-btn:hover { background: var(--accent-glow); border-color: var(--accent); transform: rotate(180deg); }
+
+  /* ── Switch ── */
+  .conv-toggle { display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1.2rem; background: var(--surface2); border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 1.5rem; }
+  .conv-toggle-left { display: flex; align-items: center; gap: 0.6rem; }
+  .conv-toggle label { font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .switch { position: relative; width: 44px; height: 24px; cursor: pointer; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: var(--surface); border-radius: 24px; border: 1px solid var(--border); transition: 0.3s; }
+  .slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; bottom: 3px; background: var(--text2); border-radius: 50%; transition: 0.3s; }
+  .switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked + .slider::before { transform: translateX(20px); background: #000; }
+
+  /* ── Recorder ── */
+  .recorder-area { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 2rem 1rem; background: var(--surface2); border-radius: var(--radius-sm); border: 1px dashed var(--border); margin-bottom: 1.5rem; }
+  .mic-btn { width: 80px; height: 80px; border-radius: 50%; border: 2px solid var(--border); background: var(--surface); color: var(--text); font-size: 2rem; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; }
+  .mic-btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
+  .mic-btn.recording { border-color: var(--danger); color: var(--danger); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)} 50%{box-shadow:0 0 0 20px rgba(239,68,68,0)} }
+  .recorder-label { font-size: 0.85rem; font-weight: 500; color: var(--text2); }
+
+  .text-input { width: 100%; min-height: 120px; padding: 1rem; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: inherit; font-size: 1rem; resize: vertical; margin-bottom: 1.5rem; line-height: 1.5; }
+  .text-input:focus { outline: none; border-color: var(--accent); }
+
+  /* ── Buttons ── */
+  .translate-btn { width: 100%; padding: 1rem; background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%); border: none; border-radius: var(--radius-sm); color: #000; font-family: inherit; font-size: 1.05rem; font-weight: 700; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+  .translate-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 25px var(--accent-glow); }
+  .translate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  /* ── Spinner ── */
+  .spinner { display: none; width: 22px; height: 22px; border: 3px solid rgba(0,0,0,0.2); border-top-color: #000; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .spinner.visible { display: inline-block; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  /* ── Chat History ── */
+  .chat-history { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; margin-top: 1.5rem; max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .chat-history.hidden { display: none !important; }
+  .chat-bubble { max-width: 90%; padding: 10px 14px; border-radius: 12px; font-size: 0.9rem; line-height: 1.4; position: relative; }
+  
+  .chat-bubble.user { align-self: flex-start; background: var(--surface2); border-bottom-left-radius: 4px; color: var(--text2); display: flex; align-items: center; gap: 12px;}
+  
+  .chat-bubble.ai { align-self: flex-end; background: var(--accent-glow); border: 1px solid rgba(245,158,11,0.3); border-bottom-right-radius: 4px; color: var(--text); display: flex; align-items: center; gap: 12px;}
+  
+  .chat-lang { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; opacity: 0.6; display: block; margin-bottom: 2px;}
+  .bubble-content { flex: 1; }
+  
+  .msg-actions { display: flex; gap: 6px; }
+  .play-btn-mini { background: none; border: none; color: var(--accent); cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.2s;}
+  .play-btn-mini:hover { background: rgba(255,255,255,0.1); }
+  .chat-bubble.user .play-btn-mini { color: var(--text2); }
+  .chat-bubble.user .play-btn-mini:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+  
+
+  .tts-warning { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.25); color: #fbbf24; font-size: 0.78rem; line-height: 1.35; }
+  .notice-stack { position: fixed; right: 18px; bottom: 18px; z-index: 30; display: flex; flex-direction: column; gap: 10px; width: min(420px, calc(100vw - 36px)); }
+  .notice { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 14px; padding: 12px 14px; box-shadow: 0 12px 30px rgba(0,0,0,0.35); font-size: 0.88rem; line-height: 1.4; animation: fadeIn 0.18s ease; }
+  .notice.warning { border-color: rgba(245,158,11,0.45); }
+  .notice.info { border-color: rgba(59,130,246,0.55); }
+  .notice.error { border-color: rgba(239,68,68,0.55); }
+  .notice-title { font-weight: 700; margin-bottom: 3px; }
+
+  .clear-chat { align-self: center; background: none; border: none; color: var(--danger); font-size: 0.75rem; cursor: pointer; margin-bottom: 10px; font-family: inherit;}
+  .clear-chat:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div id="notice-stack" class="notice-stack" aria-live="polite"></div>
+
+<div class="app">
+  <div class="header">
+    <svg class="logo-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+      <circle cx="12" cy="12" r="4"/>
+    </svg>
+    <h1>Gemma 4 Omni</h1>
+    <div class="subtitle">Multimodal Native Audio Translation</div>
+    <div class="badge-row">
+      <span class="badge"><span class="dot"></span> {{ model_ver }}</span>
+      <span class="badge">⚡ {{ gpu_str }}</span>
+      <span class="badge">🔊 {{ tts_str }}</span>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="speech" onclick="switchTab('speech')">🎤 Speech</button>
+    <button class="tab-btn" data-tab="text" onclick="switchTab('text')">⌨️ Text</button>
+  </div>
+
+  <!-- Speech Panel -->
+  <div id="panel-speech" class="tab-panel active">
+    <div class="card">
+      <div class="lang-row">
+        <div class="lang-select-wrap"><label>From</label><select id="s-src" class="lang-select">{% for l in languages %}<option {{ 'selected' if l == 'English' }}>{{ l }}</option>{% endfor %}</select></div>
+        <button class="swap-btn" onclick="swapLangs('s')">⇄</button>
+        <div class="lang-select-wrap"><label>To</label><select id="s-tgt" class="lang-select">{% for l in languages %}<option {{ 'selected' if l == 'Italian' }}>{{ l }}</option>{% endfor %}</select></div>
+      </div>
+
+      <div class="conv-toggle">
+        <div class="conv-toggle-left"><span>💬</span> <label for="s-conv-mode">Auto-swap Conversation Mode</label></div>
+        <div class="switch"><input type="checkbox" id="s-conv-mode"><span class="slider"></span></div>
+      </div>
+
+      <div class="conv-toggle">
+        <div class="conv-toggle-left"><span>🔊</span> <label for="s-voice-output">Generate voice output</label></div>
+        <div class="switch"><input type="checkbox" id="s-voice-output" checked><span class="slider"></span></div>
+      </div>
+
+      <div class="recorder-area">
+        <button class="mic-btn" id="mic-btn" onclick="toggleRecording()">🎙️</button>
+        <div class="recorder-label" id="rec-label">Press to record</div>
+      </div>
+
+      <button class="translate-btn" id="s-translate" onclick="translateSpeech()">
+        <span id="s-btn-text">Translate Native Speech</span>
+        <div class="spinner" id="s-spinner"></div>
+      </button>
+
+      <div class="chat-history hidden" id="s-chat-box">
+        <button class="clear-chat" onclick="clearChat('s')">Clear history</button>
+        <div id="s-chat-content" style="display: flex; flex-direction: column; gap: 10px;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Text Panel -->
+  <div id="panel-text" class="tab-panel">
+    <div class="card">
+      <div class="lang-row">
+        <div class="lang-select-wrap"><label>From</label><select id="t-src" class="lang-select">{% for l in languages %}<option {{ 'selected' if l == 'English' }}>{{ l }}</option>{% endfor %}</select></div>
+        <button class="swap-btn" onclick="swapLangs('t')">⇄</button>
+        <div class="lang-select-wrap"><label>To</label><select id="t-tgt" class="lang-select">{% for l in languages %}<option {{ 'selected' if l == 'Italian' }}>{{ l }}</option>{% endfor %}</select></div>
+      </div>
+
+      <div class="conv-toggle">
+        <div class="conv-toggle-left"><span>💬</span> <label for="t-conv-mode">Auto-swap Conversation Mode</label></div>
+        <div class="switch"><input type="checkbox" id="t-conv-mode"><span class="slider"></span></div>
+      </div>
+
+      <div class="conv-toggle">
+        <div class="conv-toggle-left"><span>🔊</span> <label for="t-voice-output">Generate voice output</label></div>
+        <div class="switch"><input type="checkbox" id="t-voice-output" checked><span class="slider"></span></div>
+      </div>
+
+      <textarea class="text-input" id="t-input" placeholder="Type your text here..."></textarea>
+      
+      <button class="translate-btn" id="t-translate" onclick="translateText()">
+        <span id="t-btn-text">Translate Text</span>
+        <div class="spinner" id="t-spinner"></div>
+      </button>
+
+      <div class="chat-history hidden" id="t-chat-box">
+        <button class="clear-chat" onclick="clearChat('t')">Clear history</button>
+        <div id="t-chat-content" style="display: flex; flex-direction: column; gap: 10px;"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+}
+
+function showNotice(type, message, title = '') {
+  const stack = document.getElementById('notice-stack');
+  if(!stack) return;
+  const div = document.createElement('div');
+  div.className = `notice ${type || 'warning'}`;
+  const safeTitle = escapeHtml(title || (type === 'error' ? 'Operation failed' : type === 'info' ? 'Info' : 'Warning'));
+  const safeMsg = escapeHtml(message || 'Something went wrong.');
+  div.innerHTML = `<div class="notice-title">${safeTitle}</div><div>${safeMsg}</div>`;
+  stack.appendChild(div);
+  setTimeout(() => { div.style.opacity = '0'; div.style.transform = 'translateY(-8px)'; }, 4300);
+  setTimeout(() => div.remove(), 5000);
+}
+
+function friendlyClientError(message) {
+  const m = String(message || '');
+  const lower = m.toLowerCase();
+  if(lower.includes('ffmpeg') || lower.includes('winerror 2') || lower.includes('executable not found')) {
+    return 'FFmpeg is not configured or cannot be reached. Check FFMPEG_BIN in the .env file or your Windows PATH.';
+  }
+  if(lower.includes('out of memory') || lower.includes('cuda') || lower.includes('paging file')) {
+    return 'The GPU inference failed. Check available memory, loaded model state, and the Python terminal.';
+  }
+  if(lower.includes('no audio')) {
+    return 'No valid audio was received. Record again and try one more time.';
+  }
+  if(lower.includes('unsupported language')) {
+    return 'This language is not supported by the current configuration.';
+  }
+  return 'The request failed. Check the Python terminal for technical details.';
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+}
+
+function swapLangs(prefix) {
+  const src = document.getElementById(prefix + '-src'), tgt = document.getElementById(prefix + '-tgt');
+  [src.value, tgt.value] = [tgt.value, src.value];
+}
+
+// ── Download / Playback Handlers ──
+let activeAudio = null;
+
+function stopActiveAudio() {
+  if(activeAudio) {
+    try { activeAudio.pause(); activeAudio.currentTime = 0; } catch(_) {}
+    activeAudio = null;
+  }
+}
+
+function playAudioUrlOnce(url) {
+  if(!url) return showNotice('warning', 'Audio is not available.');
+  stopActiveAudio();
+  activeAudio = new Audio(url);
+  activeAudio.onended = () => { activeAudio = null; };
+  activeAudio.play().catch(err => {
+    console.error(err);
+    showNotice('warning', 'The browser could not play this audio.');
+  });
+}
+
+function downloadAudioUrl(url, filename) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function audioDataUrl(base64Data, mimeType = 'audio/wav') {
+  return `data:${mimeType};base64,${base64Data}`;
+}
+
+function downloadBase64Audio(base64Data, filename, mimeType = 'audio/wav') {
+  if(!base64Data) return showNotice('warning', 'Synthesized audio is not available. Check your Piper voice configuration.');
+  const url = audioDataUrl(base64Data, mimeType);
+  downloadAudioUrl(url, filename);
+}
+
+// ── Chat Logic ──
+const chats = { s: [], t: [] };
+
+function clearChat(prefix) { 
+  chats[prefix] = []; 
+  document.getElementById(prefix + '-chat-box').classList.add('hidden');
+  renderChat(prefix); 
+}
+
+function appendToChat(prefix, srcLang, tgtLang, originalText, translatedText, audioB64, originalAudioUrl = null, audioMime = 'audio/wav', ttsWarning = '', ttsDetail = '', audioSkipped = false) {
+  chats[prefix].push({ srcLang, tgtLang, originalText, translatedText, audioB64, originalAudioUrl, audioMime, ttsWarning, ttsDetail, audioSkipped });
+  
+  document.getElementById(prefix + '-chat-box').classList.remove('hidden');
+  renderChat(prefix);
+
+  if(document.getElementById(prefix + '-conv-mode').checked) {
+    swapLangs(prefix);
+  }
+}
+
+function playOriginalAudio(prefix, i) {
+  const msg = chats[prefix]?.[i];
+  if(!msg?.originalAudioUrl) return showNotice('warning', 'Original audio is not available.');
+  playAudioUrlOnce(msg.originalAudioUrl);
+}
+
+function playTranslatedAudio(prefix, i) {
+  const msg = chats[prefix]?.[i];
+  if(!msg?.audioB64) return showNotice('warning', msg?.ttsWarning || 'Synthesized audio is not available.');
+  playAudioUrlOnce(audioDataUrl(msg.audioB64, msg.audioMime || 'audio/wav'));
+}
+
+function renderChat(prefix) {
+  const container = document.getElementById(prefix + '-chat-content');
+  const box = document.getElementById(prefix + '-chat-box');
+  container.innerHTML = '';
+  
+  chats[prefix].forEach((msg, i) => {
+    // User Bubble
+    if(msg.originalText && msg.originalText !== 'N/A') {
+      let actionsHTML = '';
+      if(msg.originalAudioUrl) {
+        actionsHTML = `
+          <div class="msg-actions">
+            <button type="button" class="play-btn-mini" onclick="event.stopPropagation(); playOriginalAudio('${prefix}', ${i})" title="Play original audio">▶️</button>
+            <button type="button" class="play-btn-mini" onclick="event.stopPropagation(); downloadAudioUrl(chats['${prefix}'][${i}].originalAudioUrl, 'original_${escapeHtml(msg.srcLang)}.webm')" title="Download original audio">⬇️</button>
+          </div>`;
+      }
+      container.innerHTML += `
+        <div class="chat-bubble user">
+          <div class="bubble-content">
+            <span class="chat-lang">${escapeHtml(msg.srcLang)}</span>
+            ${escapeHtml(msg.originalText)}
+          </div>
+          ${actionsHTML}
+        </div>`;
+    }
+    
+    // AI Bubble
+    const warningHTML = msg.ttsWarning ? `
+        <div class="tts-warning">⚠️ ${escapeHtml(msg.ttsWarning)}</div>` : '';
+
+    let aiActions = '';
+    if(msg.audioB64) {
+      aiActions = `
+        <div class="msg-actions">
+          <button type="button" class="play-btn-mini" onclick="event.stopPropagation(); playTranslatedAudio('${prefix}', ${i})" title="Play translation audio">▶️</button>
+          <button type="button" class="play-btn-mini" onclick="event.stopPropagation(); downloadBase64Audio(chats['${prefix}'][${i}].audioB64, 'translation_${escapeHtml(msg.tgtLang)}.wav', chats['${prefix}'][${i}].audioMime)" title="Download translated audio">⬇️</button>
+        </div>`;
+    } else if(msg.ttsWarning) {
+      aiActions = `
+        <div class="msg-actions">
+          <button type="button" class="play-btn-mini" onclick="event.stopPropagation(); showNotice('warning', chats['${prefix}'][${i}].ttsWarning || 'Piper audio is not available.')" title="Piper audio is not available">⚠️</button>
+        </div>`;
+    }
+
+    container.innerHTML += `
+      <div class="chat-bubble ai">
+        <div class="bubble-content">
+          <span class="chat-lang">${escapeHtml(msg.tgtLang)}</span>
+          ${escapeHtml(msg.translatedText)}
+          ${warningHTML}
+        </div>
+        ${aiActions}
+      </div>`;
+  });
+  
+  box.scrollTop = box.scrollHeight;
+}
+
+// ── Audio Recording ──
+let mediaRecorder = null;
+let audioChunks = [];
+let recordedBlob = null;
+let mediaStream = null;
+let pendingStopResolve = null;
+let pendingStopLabel = 'Audio ready.';
+
+function isRecording() {
+  return mediaRecorder && mediaRecorder.state === 'recording';
+}
+
+function setRecordingUI(recording, labelText) {
+  const btn = document.getElementById('mic-btn');
+  const label = document.getElementById('rec-label');
+  btn.classList.toggle('recording', !!recording);
+  if(labelText) label.textContent = labelText;
+}
+
+async function startRecording() {
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    recordedBlob = null;
+    mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm;codecs=opus' });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      if(mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+      mediaStream = null;
+      setRecordingUI(false, pendingStopLabel || 'Audio ready.');
+      if(pendingStopResolve) {
+        pendingStopResolve(recordedBlob);
+        pendingStopResolve = null;
+      }
+    };
+    mediaRecorder.start(250);
+    setRecordingUI(true, 'Listening... click the microphone again to stop.');
+  } catch (err) {
+    console.error(err);
+    setRecordingUI(false, 'Microphone unavailable.');
+    showNotice('error', 'The microphone is unavailable or permission was denied.');
+  }
+}
+
+function stopRecording(finalLabel = 'Audio ready.') {
+  if(!isRecording()) return Promise.resolve(recordedBlob);
+  pendingStopLabel = finalLabel;
+  return new Promise(resolve => {
+    pendingStopResolve = resolve;
+    mediaRecorder.stop();
+  });
+}
+
+async function toggleRecording() {
+  if(isRecording()) {
+    await stopRecording('Audio ready.');
+    return;
+  }
+  await startRecording();
+}
+
+// ── API Calls ──
+async function translateSpeech() {
+  if(isRecording()) {
+    showNotice('info', 'Recording stopped. Starting translation...', 'Recording captured');
+    await stopRecording('Audio captured. Translating...');
+  }
+
+  if(!recordedBlob) return showNotice('warning', 'Record audio before starting translation.', 'Missing audio');
+
+  const btn = document.getElementById('s-translate'), spinner = document.getElementById('s-spinner'), text = document.getElementById('s-btn-text');
+  btn.disabled = true; spinner.classList.add('visible'); text.textContent = 'Multimodal Processing...';
+  
+  const fd = new FormData();
+  fd.append('audio', recordedBlob);
+  fd.append('src_lang', document.getElementById('s-src').value);
+  fd.append('tgt_lang', document.getElementById('s-tgt').value);
+  fd.append('enable_tts', document.getElementById('s-voice-output').checked ? '1' : '0');
+
+  try {
+    const res = await fetch('/api/translate_speech', { method: 'POST', body: fd });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    
+    if(data.audio) playAudioUrlOnce(audioDataUrl(data.audio, data.audio_mime || 'audio/wav'));
+    const originalAudioUrl = URL.createObjectURL(recordedBlob);
+    
+    appendToChat('s', data.src, data.tgt, data.original_text, data.text, data.audio, originalAudioUrl, data.audio_mime || 'audio/wav', data.tts_warning || '', data.tts_detail || '', !!data.audio_skipped);
+    document.getElementById('rec-label').textContent = 'Audio saved. Change language and translate again, or record a new message.';
+    
+  } catch (e) {
+    console.error(e);
+    showNotice('error', friendlyClientError(e.message));
+  }
+  finally { btn.disabled = false; spinner.classList.remove('visible'); text.textContent = 'Translate Native Speech'; }
+}
+
+async function translateText() {
+  const input = document.getElementById('t-input').value.trim();
+  if(!input) return showNotice('warning', 'Type some text before starting translation.', 'Missing text');
+  const btn = document.getElementById('t-translate'), spinner = document.getElementById('t-spinner'), text = document.getElementById('t-btn-text');
+  btn.disabled = true; spinner.classList.add('visible'); text.textContent = 'Processing...';
+
+  try {
+    const res = await fetch('/api/translate_text', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: input,
+        src_lang: document.getElementById('t-src').value,
+        tgt_lang: document.getElementById('t-tgt').value,
+        enable_tts: document.getElementById('t-voice-output').checked
+      })
+    });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    
+    if(data.audio) playAudioUrlOnce(audioDataUrl(data.audio, data.audio_mime || 'audio/wav'));
+    appendToChat('t', data.src, data.tgt, data.input_text, data.text, data.audio, null, data.audio_mime || 'audio/wav', data.tts_warning || '', data.tts_detail || '', !!data.audio_skipped);
+    
+    document.getElementById('t-input').value = '';
+  } catch (e) {
+    console.error(e);
+    showNotice('error', friendlyClientError(e.message));
+  }
+  finally { btn.disabled = false; spinner.classList.remove('visible'); text.textContent = 'Translate Text'; }
+}
+</script>
+</body>
+</html>
