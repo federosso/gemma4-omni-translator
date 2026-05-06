@@ -16,16 +16,14 @@ The goal is simple: **translate speech without sending the user's voice or trans
 
 ---
 
-## 🚀 Try the Colab Demo
+## ▶️ Run the Demo
 
-Want to test the project quickly without setting up the full local environment?
-
-You can run the reproducible demo directly in Google Colab:
+Explore **Gemma 4 Omni-Translator** directly in Colab:
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/10Hzr8qZRwoX_le15wSz7P00Ltdj6hBiG?usp=sharing)
 
-> **Note:** the Colab version is designed for public testing and reproducibility.  
-> For the full privacy-first/offline experience, run the app locally with Gemma 4 and Piper voices installed on your machine.
+The Colab notebook provides a quick, reproducible demo of the app.  
+For the complete offline-first experience, use the local GitHub setup with Gemma 4 and Piper voices installed on your machine.
 
 ---
 
